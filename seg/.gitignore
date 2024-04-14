@@ -37,6 +37,7 @@ pip-delete-this-directory.txt
 
 # Experiment logs
 work_dirs
+pictures
 
 # Unit test / coverage reports
 htmlcov/
