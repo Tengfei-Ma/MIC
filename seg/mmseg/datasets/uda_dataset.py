@@ -96,13 +96,13 @@ class UDADataset(object):
                 self.samples_with_class[c] = []
                 for file, pixels in samples_with_class_and_n[c]:
                     if pixels > self.rcs_min_pixels:
-                        self.samples_with_class[c].append(file.split('/')[-1])
+                        self.samples_with_class[c].append(file.split('\\')[-1])
                 assert len(self.samples_with_class[c]) > 0
             self.file_to_idx = {}
             for i, dic in enumerate(self.source.img_infos):
                 file = dic['ann']['seg_map']
                 if isinstance(self.source, CityscapesDataset):
-                    file = file.split('/')[-1]
+                    file = file.split('\\')[-1]
                 self.file_to_idx[file] = i
 
     def synchronized_crop(self, s1, s2):

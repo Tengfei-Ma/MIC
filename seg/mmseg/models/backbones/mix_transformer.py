@@ -7,16 +7,25 @@
 # A copy of the license is available at resources/license_segformer
 
 import math
+import os.path
 import warnings
 from functools import partial
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mmcv.runner import BaseModule, _load_checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
 from mmseg.models.builder import BACKBONES
 from mmseg.utils import get_root_logger
+
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from mmseg.ops import resize
+from datetime import datetime
+import uuid
 
 
 class Mlp(nn.Module):
@@ -63,7 +72,7 @@ class Attention(nn.Module):
         self.dim = dim
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim**-0.5
+        self.scale = qk_scale or head_dim ** -0.5
 
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
@@ -89,11 +98,11 @@ class Attention(nn.Module):
             x_ = self.norm(x_)
             kv = self.kv(x_).reshape(B, -1, 2, self.num_heads,
                                      C // self.num_heads).permute(
-                                         2, 0, 3, 1, 4).contiguous()
+                2, 0, 3, 1, 4).contiguous()
         else:
             kv = self.kv(x).reshape(B, -1, 2, self.num_heads,
                                     C // self.num_heads).permute(
-                                        2, 0, 3, 1, 4).contiguous()
+                2, 0, 3, 1, 4).contiguous()
         k, v = kv[0], kv[1]
 
         attn = (q @ k.transpose(-2, -1).contiguous()) * self.scale
@@ -212,11 +221,11 @@ class MixVisionTransformer(BaseModule):
 
         assert not (init_cfg and pretrained), \
             'init_cfg and pretrained cannot be setting at the same time'
-        if isinstance(pretrained, str) or pretrained is None:
-            warnings.warn('DeprecationWarning: pretrained is a deprecated, '
-                          'please use "init_cfg" instead')
-        else:
-            raise TypeError('pretrained must be a str or None')
+        # if isinstance(pretrained, str) or pretrained is None:
+        #     warnings.warn('DeprecationWarning: pretrained is a deprecated, '
+        #                   'please use "init_cfg" instead')
+        # else:
+        #     raise TypeError('pretrained must be a str or None')
 
         self.num_classes = num_classes
         self.depths = depths
@@ -323,38 +332,38 @@ class MixVisionTransformer(BaseModule):
         # self.head = nn.Linear(embed_dims[3], num_classes) \
         #     if num_classes > 0 else nn.Identity()
 
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
-
-    def init_weights(self):
-        logger = get_root_logger()
-        if self.pretrained is None:
-            logger.info('Init mit from scratch.')
-            for m in self.modules():
-                self._init_weights(m)
-        elif isinstance(self.pretrained, str):
-            logger.info('Load mit checkpoint.')
-            checkpoint = _load_checkpoint(
-                self.pretrained, logger=logger, map_location='cpu')
-            if 'state_dict' in checkpoint:
-                state_dict = checkpoint['state_dict']
-            elif 'model' in checkpoint:
-                state_dict = checkpoint['model']
-            else:
-                state_dict = checkpoint
-            self.load_state_dict(state_dict, False)
+    # def _init_weights(self, m):
+    #     if isinstance(m, nn.Linear):
+    #         trunc_normal_(m.weight, std=.02)
+    #         if isinstance(m, nn.Linear) and m.bias is not None:
+    #             nn.init.constant_(m.bias, 0)
+    #     elif isinstance(m, nn.LayerNorm):
+    #         nn.init.constant_(m.bias, 0)
+    #         nn.init.constant_(m.weight, 1.0)
+    #     elif isinstance(m, nn.Conv2d):
+    #         fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+    #         fan_out //= m.groups
+    #         m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+    #         if m.bias is not None:
+    #             m.bias.data.zero_()
+    #
+    # def init_weights(self):
+    #     logger = get_root_logger()
+    #     if self.pretrained is None:
+    #         logger.info('Init mit from scratch.')
+    #         for m in self.modules():
+    #             self._init_weights(m)
+    #     elif isinstance(self.pretrained, str):
+    #         logger.info('Load mit checkpoint.')
+    #         checkpoint = _load_checkpoint(
+    #             self.pretrained, logger=logger, map_location='cpu')
+    #         if 'state_dict' in checkpoint:
+    #             state_dict = checkpoint['state_dict']
+    #         elif 'model' in checkpoint:
+    #             state_dict = checkpoint['model']
+    #         else:
+    #             state_dict = checkpoint
+    #         self.load_state_dict(state_dict, False)
 
     def reset_drop_path(self, drop_path_rate):
         dpr = [
@@ -397,13 +406,15 @@ class MixVisionTransformer(BaseModule):
     def forward_features(self, x):
         B = x.shape[0]
         outs = []
-
+        image = x
         # stage 1
         x, H, W = self.patch_embed1(x)
         for i, blk in enumerate(self.block1):
             x = blk(x, H, W)
         x = self.norm1(x)
+        visualization(B, image, x, H, W)
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+
         outs.append(x)
 
         # stage 2
@@ -411,6 +422,7 @@ class MixVisionTransformer(BaseModule):
         for i, blk in enumerate(self.block2):
             x = blk(x, H, W)
         x = self.norm2(x)
+        visualization(B, image, x, H, W)
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
@@ -419,6 +431,7 @@ class MixVisionTransformer(BaseModule):
         for i, blk in enumerate(self.block3):
             x = blk(x, H, W)
         x = self.norm3(x)
+        visualization(B, image, x, H, W)
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
@@ -427,6 +440,7 @@ class MixVisionTransformer(BaseModule):
         for i, blk in enumerate(self.block4):
             x = blk(x, H, W)
         x = self.norm4(x)
+        visualization(B, image, x, H, W)
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
@@ -437,6 +451,59 @@ class MixVisionTransformer(BaseModule):
         # x = self.head(x)
 
         return x
+
+
+def visualization(B, image, x, H, W):
+    save_dir = 'F:/python_projects/MIC/seg/pictures'
+    for i in range(B):
+        filename = f'{datetime.now().strftime("%y%m%d_%H%M%S")}_{str(uuid.uuid4())[:5]}'
+        filepath = os.path.join(save_dir, filename)
+        os.makedirs(filepath, exist_ok=True)
+
+        attention_weights = x[i].unsqueeze(0)
+        attention_weights = attention_weights.reshape(1, H, W, -1)
+        max_attention, _ = torch.max(attention_weights, dim=3, keepdim=True)
+        show_attention = max_attention.squeeze(0)
+        max_attention = F.avg_pool2d(max_attention.permute(0, 3, 1, 2), kernel_size=(int(H / 16), int(H / 16)),
+                                     stride=(int(H / 16)))
+        max_attention = max_attention.squeeze(0).permute(1, 2, 0)
+
+        # 可视化注意力图
+        plt.imshow(show_attention.detach().cpu().numpy(), cmap='jet', interpolation='nearest')
+        plt.colorbar()  # 添加颜色条
+        plt.axis('off')  # 不显示坐标轴
+        plt.savefig(filepath + '/attention.png')
+        plt.show()
+        plt.close()
+
+        # 设计掩码
+        flatten_attention = max_attention.view(-1)
+        threshold_index = int(0.5 * flatten_attention.numel())
+        threshold_value, _ = torch.kthvalue(flatten_attention, threshold_index)
+        max_attention = max_attention.permute(2, 0, 1)
+        input_mask = (max_attention < threshold_value).float()
+        input_mask = input_mask.unsqueeze(0)
+        input_mask = resize(input_mask, size=(512, 512))
+        input_mask = input_mask.squeeze(0)
+        mask = input_mask.permute(1, 2, 0)
+        plt.imshow(mask.detach().cpu().numpy())
+        plt.axis('off')  # 不显示坐标轴
+        plt.savefig(filepath + '/mask.png')
+
+        img=image[i].permute(1,2,0)
+        plt.imshow(img.detach().cpu().numpy())
+        plt.axis('off')  # 不显示坐标轴
+        plt.savefig(filepath + '/img.png')
+        plt.show()
+        plt.close()
+
+        masked_img = image[i] * input_mask
+        masked_img = masked_img.permute(1, 2, 0)
+        plt.imshow(masked_img.detach().cpu().numpy())
+        plt.axis('off')  # 不显示坐标轴
+        plt.savefig(filepath + '/masked_img.png')
+        plt.show()
+        plt.close()
 
 
 class DWConv(nn.Module):

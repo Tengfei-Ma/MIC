@@ -4,6 +4,7 @@
 # ---------------------------------------------------------------
 
 import torch
+from matplotlib import pyplot as plt
 
 from mmseg.ops import resize
 
@@ -38,4 +39,11 @@ class BlockMaskGenerator:
     @torch.no_grad()
     def mask_image(self, imgs):
         input_mask = self.generate_mask(imgs)
+        # mask0 = input_mask[0].permute(1, 2, 0)
+        # mask1 = input_mask[1].permute(1, 2, 0)
+        # # 显示当前图像
+        # plt.imshow(mask0.detach().cpu().numpy())  # 转换张量形状为 (H, W, C)
+        # plt.imshow(mask1.detach().cpu().numpy())  # 转换张量形状为 (H, W, C)
+        # plt.axis('off')
+        # plt.show()
         return imgs * input_mask

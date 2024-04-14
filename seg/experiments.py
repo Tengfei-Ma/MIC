@@ -370,7 +370,7 @@ def generate_experiment_cfgs(id):
     iters = 40000
     opt, lr, schedule, pmult = 'adamw', 0.00006, 'poly10warm', True
     crop = '512x512'
-    gpu_model = 'NVIDIAGeForceRTX2080Ti'
+    gpu_model = 'NVIDIAGeForceRTX4060Ti'
     datasets = [
         ('gta', 'cityscapes'),
     ]
@@ -392,7 +392,7 @@ def generate_experiment_cfgs(id):
     # -------------------------------------------------------------------------
     # yapf: disable
     if id == 80:
-        seeds = [0, 1, 2]
+        seeds = [0]
         architecture, backbone = 'hrda1-512-0.1_daformer_sepaspp', 'mitb5'
         uda, rcs_T = 'dacs_a999_fdthings', 0.01
         crop, rcs_min_crop = '1024x1024', 0.5 * (2 ** 2)
@@ -405,7 +405,6 @@ def generate_experiment_cfgs(id):
             ('cityscapesHR', 'darkzurichHR', 'separate'),
         ]:
             for seed in seeds:
-                gpu_model = 'NVIDIATITANRTX'
                 # plcrop is only necessary for Cityscapes as target domains
                 # ACDC and DarkZurich have no rectification artifacts.
                 plcrop = 'v2' if 'cityscapes' in target else False
@@ -415,7 +414,7 @@ def generate_experiment_cfgs(id):
     # MIC with Further UDA Methods (Table 1)
     # -------------------------------------------------------------------------
     elif id == 81:
-        seeds = [0, 1, 2]
+        seeds = [0]
         #        opt,     lr,      schedule,     pmult
         sgd   = ('sgd',   0.0025,  'poly10warm', False)
         adamw = ('adamw', 0.00006, 'poly10warm', True)
@@ -438,13 +437,13 @@ def generate_experiment_cfgs(id):
             if 'hrda' in architecture:
                 source, target, crop = 'gtaHR', 'cityscapesHR', '1024x1024'
                 rcs_min_crop = 0.5 * (2 ** 2)
-                gpu_model = 'NVIDIATITANRTX'
+                # gpu_model = 'NVIDIATITANRTX'
                 inference = 'slide'
                 mask_block_size = 64
             else:
                 source, target, crop = 'gta', 'cityscapes', '512x512'
                 rcs_min_crop = 0.5
-                gpu_model = 'NVIDIAGeForceRTX2080Ti'
+                # gpu_model = 'NVIDIAGeForceRTX2080Ti'
                 inference = 'whole'
                 # Use half the patch size when training with half resolution
                 mask_block_size = 32

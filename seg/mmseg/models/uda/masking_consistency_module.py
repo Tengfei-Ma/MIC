@@ -11,6 +11,8 @@ from torch.nn import Module
 from mmseg.models.uda.teacher_module import EMATeacher
 from mmseg.models.utils.dacs_transforms import get_mean_std, strong_transform
 from mmseg.models.utils.masking_transforms import build_mask_generator
+import matplotlib.pyplot as plt
+import torchvision
 
 
 class MaskingConsistencyModule(Module):
@@ -131,6 +133,17 @@ class MaskingConsistencyModule(Module):
 
         # Apply masking to image
         masked_img = self.mask_gen.mask_image(masked_img)
+
+        # print masked_img
+        batch_size = masked_img.shape[0]
+        for i in range(batch_size):
+            # 获取当前批次的图像张量
+            img = masked_img[i].cpu()
+            img_numpy = img.permute(1, 2, 0).detach().numpy()
+            # 显示当前图像
+            plt.imshow(img_numpy)  # 转换张量形状为 (H, W, C)
+            plt.axis('off')
+            plt.show()
 
         # Train on masked images
         masked_loss = model.forward_train(

@@ -5,8 +5,10 @@
 # ---------------------------------------------------------------
 
 # dataset settings
-dataset_type = 'CityscapesDataset'
-data_root = 'data/cityscapes/'
+source_dataset_type = 'GTADataset'
+target_dataset_type = 'CityscapesDataset'
+source_data_root = 'F:/python_projects/DAFormer/data/gta'
+target_data_root = 'F:/python_projects/DAFormer/data/cityscapes'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (512, 512)
@@ -57,26 +59,26 @@ data = dict(
     train=dict(
         type='UDADataset',
         source=dict(
-            type='GTADataset',
-            data_root='data/gta/',
+            type=source_dataset_type,
+            data_root=source_data_root,
             img_dir='images',
             ann_dir='labels',
             pipeline=gta_train_pipeline),
         target=dict(
-            type='CityscapesDataset',
-            data_root='data/cityscapes/',
+            type=target_dataset_type,
+            data_root=target_data_root,
             img_dir='leftImg8bit/train',
             ann_dir='gtFine/train',
             pipeline=cityscapes_train_pipeline)),
     val=dict(
-        type='CityscapesDataset',
-        data_root='data/cityscapes/',
+        type=target_dataset_type,
+        data_root=target_data_root,
         img_dir='leftImg8bit/val',
         ann_dir='gtFine/val',
         pipeline=test_pipeline),
     test=dict(
-        type='CityscapesDataset',
-        data_root='data/cityscapes/',
+        type=target_dataset_type,
+        data_root=target_data_root,
         img_dir='leftImg8bit/val',
         ann_dir='gtFine/val',
         pipeline=test_pipeline))
