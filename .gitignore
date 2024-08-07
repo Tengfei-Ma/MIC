@@ -111,6 +111,8 @@ venv.bak/
 data
 .vscode
 .idea
+*.iml
+*.xml
 
 # custom
 *.pkl
